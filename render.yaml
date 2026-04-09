@@ -1,18 +1,19 @@
 services:
-  # --- 1. MediaFlow Proxy (Docker) -----------------------------------------
+
   - type: web
     name: mfp
     env: docker
+    repo: https://github.com/KevinDj78/streamvix
     dockerfilePath: ./Dockerfile.mfp
     plan: free
     envVars:
       - key: API_PASSWORD
-        generateValue: true       # Render genera una password random
+        generateValue: true
 
-  # --- 2. StreamViX + SC Provider (Node.js) --------------------------------
   - type: web
     name: streamvix
     env: node
+    repo: https://github.com/KevinDj78/streamvix
     buildCommand: npm install && npm run build
     startCommand: npm start
     plan: free
@@ -24,8 +25,8 @@ services:
       - key: SC_BASE_URL
         value: https://streamingcommunityz.pet
       - key: MFP_URL
-        sync: false                # impostare dopo deploy: https://mfp.onrender.com
+        sync: false
       - key: MFP_PSW
-        sync: false                # copiare API_PASSWORD dal servizio mfp
+        sync: false
       - key: TMDB_API_KEY
-        sync: false                # opzionale
+        sync: false
