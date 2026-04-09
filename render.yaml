@@ -4,6 +4,7 @@ services:
     name: mfp
     env: docker
     branch: main
+    plan: free
     dockerfilePath: ./Dockerfile.mfp
     envVars:
       - key: API_PASSWORD
@@ -13,6 +14,7 @@ services:
     name: streamvix
     env: node
     branch: main
+    plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
