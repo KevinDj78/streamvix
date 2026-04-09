@@ -3,9 +3,8 @@ services:
   - type: web
     name: mfp
     env: docker
-    repo: https://github.com/KevinDj78/streamvix
+    branch: main
     dockerfilePath: ./Dockerfile.mfp
-    plan: free
     envVars:
       - key: API_PASSWORD
         generateValue: true
@@ -13,10 +12,9 @@ services:
   - type: web
     name: streamvix
     env: node
-    repo: https://github.com/KevinDj78/streamvix
+    branch: main
     buildCommand: npm install && npm run build
     startCommand: npm start
-    plan: free
     envVars:
       - key: PORT
         value: 10000
@@ -27,6 +25,4 @@ services:
       - key: MFP_URL
         sync: false
       - key: MFP_PSW
-        sync: false
-      - key: TMDB_API_KEY
         sync: false
