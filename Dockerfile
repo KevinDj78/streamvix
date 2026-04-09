@@ -53,4 +53,6 @@ RUN pnpm run build
 
 
 # Avvio diretto dell'addon (lo script wrapper /start per Beamup non serve più)
+EXPOSE 7860
+ENV PORT=7860
 ENTRYPOINT ["node", "dist/addon.js"]
