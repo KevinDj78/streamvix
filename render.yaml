@@ -1,16 +1,6 @@
 services:
 
   - type: web
-    name: mfp
-    env: docker
-    branch: main
-    plan: free
-    dockerfilePath: ./Dockerfile.mfp
-    envVars:
-      - key: API_PASSWORD
-        generateValue: true
-
-  - type: web
     name: streamvix
     env: node
     branch: main
