@@ -80,6 +80,7 @@ interface AddonConfig {
     fastMode?: boolean;
     // DVR setting (uses mediaFlowProxyUrl for EasyProxy)
     dvrEnabled?: boolean;
+    scEnabled?: boolean;
 }
 
 function debugLog(...args: any[]) { try { console.log('[DEBUG]', ...args); } catch { } }
@@ -888,6 +889,7 @@ const baseManifest: Manifest = {
         { key: "loonexEnabled", title: "Enable Loonex", type: "checkbox" },
         { key: "toonitaliaEnabled", title: "Enable ToonItalia", type: "checkbox" },
         { key: "cb01Enabled", title: "Enable CB01 Mixdrop", type: "checkbox" },
+        { key: "scEnabled", title: "Enable StreamingCommunity (SC)", type: "checkbox" },
         // { key: "tvtapProxyEnabled", title: "TvTap NO MFP 🔓", type: "checkbox", default: "checked" }, // TVTAP RIMOSSO
         { key: "vavooNoMfpEnabled", title: "Vavoo NO MFP 🔓", type: "checkbox", default: false },
         { key: "fastMode", title: "Modalità Veloce ⚡", type: "checkbox", default: false },
@@ -5948,7 +5950,7 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                         'trailerEnabled', 'disableVixsrc', 'vixDirect', 'vixDirectFhd', 'vixProxy',
                         'guardahdEnabled', 'guardaserieEnabled', 'guardoserieEnabled', 'guardaflixEnabled',
                         'eurostreamingEnabled', 'loonexEnabled', 'toonitaliaEnabled', 'cb01Enabled',
-                        'animesaturnEnabled', 'animeworldEnabled', 'animeunityEnabled'
+                        'animesaturnEnabled', 'animeworldEnabled', 'animeunityEnabled', 'scEnabled'
                     ];
                     return providerKeys.some(k => cfg[k] !== undefined);
                 })();
@@ -5983,6 +5985,7 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                 console.log(`[DEBUG-LOONEX] flag=${loonexEnabled} | config.loonexEnabled=${config.loonexEnabled} | rc.loonexEnabled=${rc?.loonexEnabled} | isDirectAPI=${isDirectAPICall}`);
                 // ToonItalia: default OFF (nuovo provider) - API mode enables it
                 const toonitaliaEnabled = envFlag('TOONITALIA_ENABLED') ?? (isDirectAPICall || config.toonitaliaEnabled === true || rc?.toonitaliaEnabled === true);
+                const scEnabled = envFlag('SC_ENABLED') ?? ((config as any).scEnabled === true || rc?.scEnabled === true);
                 console.log(`[ToonItalia] Flag status: ${toonitaliaEnabled} (env: ${envFlag('TOONITALIA_ENABLED')}, config: ${config.toonitaliaEnabled})`);
                 // Nuovo flag per inserire VixSrc nell'esecuzione parallela (prima era fuori e poteva saltare)
                 // FIX: usa config dell'utente, NON configCache globale
@@ -6002,7 +6005,7 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                 // IMPORTANTE: includere trailerEnabled per permettere trailer standalone
                 const trailerEnabled = (config as any).trailerEnabled !== false && rc?.trailerEnabled !== false;
                 const fastModeEnabled = (config as any).fastMode === true;
-                if ((id.startsWith('kitsu:') || id.startsWith('mal:') || id.startsWith('tt') || id.startsWith('tmdb:')) && (trailerEnabled || animeUnityEnabled || animeSaturnEnabled || animeWorldEnabled || guardaSerieEnabled || guardoserieEnabled || guardaflixEnabled || guardaHdEnabled || eurostreamingEnabled || loonexEnabled || toonitaliaEnabled || cb01Enabled || vixsrcEnabled)) {
+                if ((id.startsWith('kitsu:') || id.startsWith('mal:') || id.startsWith('tt') || id.startsWith('tmdb:')) && (trailerEnabled || animeUnityEnabled || animeSaturnEnabled || animeWorldEnabled || guardaSerieEnabled || guardoserieEnabled || guardaflixEnabled || guardaHdEnabled || eurostreamingEnabled || loonexEnabled || toonitaliaEnabled || cb01Enabled || vixsrcEnabled || scEnabled)) {
                     // Rilevamento addonBase per AnimeUnity (stessa logica VixSrc)
                     let auAddonBase = '';
                     try {
@@ -6078,7 +6081,8 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                     // Map legacy streamName label (used for ordering) to internal provider key
                     const reverseProviderKey = (label: string): string => {
                         const l = label.toLowerCase();
-                        if (l.includes('vixsrc') || l.includes('streamingcommunity')) return 'vixsrc';
+                        if (l.includes('vixsrc')) return 'vixsrc';
+                        if (l.includes('streamingcommunity')) return 'streamingcommunity-sc';
                         if (l.includes('anime unity')) return 'animeunity';
                         if (l.includes('anime saturn')) return 'animesaturn';
                         if (l.includes('anime world')) return 'animeworld';
@@ -6349,8 +6353,8 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                     };
                     const getFastPriority = (): string[] => {
                         if (isAnimeFastRequest) return ['animeunity', 'animeworld', 'animesaturn'];
-                        if (type === 'movie') return ['vixsrc', 'guardahd', 'guardaflix', 'toonitalia'];
-                        if (type === 'series') return ['vixsrc', 'guardaserie', 'cb01', 'guardoserie', 'toonitalia', 'eurostreaming'];
+                        if (type === 'movie') return ['vixsrc', 'streamingcommunity-sc', 'guardahd', 'guardaflix', 'toonitalia'];
+                        if (type === 'series') return ['vixsrc', 'streamingcommunity-sc', 'guardaserie', 'cb01', 'guardoserie', 'toonitalia', 'eurostreaming'];
                         return [];
                     };
                     const hasItalianStreams = (streams: Stream[]): boolean => {
@@ -6565,6 +6569,20 @@ function createBuilder(initialConfig: AddonConfig = {}) {
                             });
                             return cbProvider.handleImdbRequest(id, seasonNumber, episodeNumber, isMovie);
                         }, providerLabel('cb01'), true, 30000);  // CB01: timeout 30s
+                    }
+
+                    // StreamingCommunity (SC) - diretto, no vixsrc.to
+                    if (scEnabled && id.startsWith('tt')) {
+                        scheduleProviderRun('StreamingCommunity', true, async () => {
+                            const { ScProvider } = await import('./providers/sc-provider');
+                            const scProvider = new ScProvider({
+                                enabled: true,
+                                tmdbApiKey: config.tmdbApiKey || process.env.TMDB_API_KEY || '40a9faa1f6741afb2c0c40238d85f8d0',
+                                mfpUrl: mfpUrl,
+                                mfpPassword: mfpPsw
+                            });
+                            return scProvider.handleImdbRequest(id, seasonNumber, episodeNumber, isMovie);
+                        }, '🤌 StreamingCommunity 🍿', false, 35000);
                     }
 
                     // Eurostreaming
